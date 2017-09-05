@@ -1,6 +1,9 @@
+# coding:utf-8
+import numpy as np
 from copy import deepcopy
 from operator import itemgetter
 from tqdm import tqdm
+from time import time
 
 class Solver:
     def __init__(self, b_x, b_y):
@@ -50,11 +53,6 @@ class Solver:
         self.puz = [0 for i in range(self.cell_size)]
         for i,p in enumerate(puz):
             if p != 0:
-                #print(p)
-                #print('')
-                #print(i,p)
-                #self.ToStringFromPuzzle()
-                #self.ToStringFromCandidates()
                 self.PutNumber(i,p)
     def DeleteCandidate(self,p,n):
         self.candidates[p][n] = False
@@ -63,7 +61,6 @@ class Solver:
         n = n - 1
         p_x = (p%self.box_size)//self.b_x
         p_y = p//(self.box_size*self.b_y)
-        #print(p_x,p_y)
         for i in range(self.box_size):
             self.candidates[p][i] = False
             # 横
@@ -84,53 +81,82 @@ class Solver:
             if self.candidates[p_y+(self.box_size*(i//self.b_x))+p_x+(i%self.b_x)][n] == True and p_y+(self.box_size*(i//self.b_x)) != p//self.box_size and p_x+(i%self.b_x) != p%self.box_size:
                 count+=1
         return count
+
     def CheckAnsweable(self):
         log = []
-        rank = []
+        log2 = []
         for step in tqdm(range(1000000)):
+            start = time()
             # 確定した場所は埋める
-            #self.ToStringFromCandidates()
-            #self.ToStringFromPuzzle()
-            for i in range(self.cell_size):
-                if self.candidates[i].count(True) == 1:
-                    self.PutNumber(i,self.candidates[i].index(True)+1)
+            flag = True
+            while flag:
+                flag = False
+                for i,cand in enumerate(self.candidates):
+                    if cand.count(True) == 1:
+                        self.PutNumber(i,cand.index(True)+1)
+                        flag = True
+                #self.ToStringFromPuzzle()
+                for i in range(self.box_size):
+                    x = (i%self.b_x) * self.b_x
+                    y = (i//self.b_x) * self.b_y
+                    p = y * self.box_size + x
+                    for n in range(self.box_size):
+                        count = [[],[],[]]
+                        for j in range(self.box_size):
+                            if self.candidates[j*self.box_size+i][n] == True:
+                                count[0].append(j*self.box_size+i)
+                            if self.candidates[i*self.box_size+j][n] == True:
+                                count[1].append(i*self.box_size+j)
+                            if self.candidates[p+j%self.b_x+(j//self.b_x)*self.box_size][n] == True:
+                                count[2].append(p+j%self.b_x+(j//self.b_x)*self.box_size)
+                        for c in count:
+                            if len(c) == 1:
+                                self.PutNumber(c[0],n)
+                                flag = True
+
+
             if self.puz.count(0) == 0:
                 return True
+            #print('1:',time()-start)
 
             # 候補が無くなったら１つ前に戻す
-            if False:#len(log) != 0 and len(log[-1][2]) == 0:
+            # 各セルに各数字を置いた際の削除可能な候補の数を求める
+            start=time()
+            count = []
+            for i,cand in enumerate(self.candidates):
+                can_count = cand.count(True)
+                for j,c in enumerate(cand):
+                    #puz2 = self.puz[:]
+                    if c == True:
+                        #log2.append(puz2[:])
+                        # [セル番号*box_size + セル内の数字]
+                        # count.append([i*self.box_size+j,self.CountDeletableCandidates(i,j)])
+                        count.append([i*self.box_size+j,can_count])
+            #print('2:',time()-start)
+            # ログ：puz, candidates, 優先度順の候補
+            #start = time()
+            if len(count) == 0:
                 #print(log)
-                del log[-1]
                 self.puz = deepcopy(log[-1][0])
                 self.candidates = deepcopy(log[-1][1])
-            else:
-                # 各セルに各数字を置いた際の削除可能な候補の数を求める
-                count = []
-                for i in range(self.cell_size):
-                    for j in range(self.box_size):
-                        #if i==80:
-                        #    print(self.candidates[i][j+1])
-                        if self.candidates[i][j] == True:
-                            # [セル番号*box_size + セル内の数字]
-                            #count.append([i*self.box_size+j,self.CountDeletableCandidates(i,j)])
-                            count.append([i*self.box_size+j,self.candidates[i].count(True)])
-                # ログ：puz, candidates, 優先度順の候補
-                if len(count) == 0:
-                    self.puz = deepcopy(log[-1][0])
+                while len(log[-1][2]) == 0:
+                    del log[-1]
+                    self.puz = log[-1][0][:]
                     self.candidates = deepcopy(log[-1][1])
-                    #del log[-1][2][0]
-                    while len(log[-1][2]) == 0:
-                        del log[-1]
-                        self.puz = deepcopy(log[-1][0])
-                        self.candidates = deepcopy(log[-1][1])
-                else:
-                    count.sort(key=itemgetter(1))
-                    #count.reverse()
-                    log.append([deepcopy(self.puz), deepcopy(self.candidates), count])
+            else:
+                start = time()
+                count.sort(key=itemgetter(1))
+                log.append([self.puz[:], deepcopy(self.candidates), count])
+                #print('3:',time()-start)
             # セル番号,数字
+            start = time()
             self.PutNumber(log[-1][2][0][0]//self.box_size, log[-1][2][0][0]%self.box_size+1)
+            #if self.puz in log2:
+                #print('true')
+                #return False
+            self.ToStringFromPuzzle()
+            #self.ToStringFromCandidates()
             del log[-1][2][0]
-
             if self.puz.count(0) == 0:
                 return True
             if len(log) == 0:
@@ -140,10 +166,68 @@ class Solver:
                     return True
                 else:
                     return False
+            #print('4:',time()-start)
+    def CheckAnsweable2(self):
+        log = []
+        for step in tqdm(range(1000000)):
+            # 確定した場所は埋める
+            for cand in self.candidates:
+                if cand.count(True) == 1:
+                    self.PutNumber(i,cand.index(True)+1)
+            if self.puz.count(0) == 0:
+                return True
+            #print('1:',time()-start)
+
+            # 候補が無くなったら１つ前に戻す
+            # 各セルに各数字を置いた際の削除可能な候補の数を求める
+            start=time()
+            count = []
+            for i,cand in enumerate(self.candidates):
+                can_count = cand.count(True)
+                for j,c in enumerate(cand):
+                    #puz2 = self.puz[:]
+                    puz2[i] = j
+                    if c == True:
+                        #log2.append(puz2[:])
+                        # [セル番号*box_size + セル内の数字]
+                        # count.append([i*self.box_size+j,self.CountDeletableCandidates(i,j)])
+                        count.append([i*self.box_size+j,can_count])
+            #print('2:',time()-start)
+            # ログ：puz, candidates, 優先度順の候補
+            #start = time()
+            if len(count) == 0:
+                self.puz = deepcopy(log[-1][0])
+                self.candidates = deepcopy(log[-1][1])
+                while len(log[-1][2]) == 0:
+                    del log[-1]
+                    self.puz = log[-1][0][:]
+                    self.candidates = deepcopy(log[-1][1])
+            else:
+                start = time()
+                count.sort(key=itemgetter(1))
+                log.append([self.puz[:], deepcopy(self.candidates), count])
+                #print('3:',time()-start)
+            # セル番号,数字
+            start = time()
+            self.PutNumber(log[-1][2][0][0]//self.box_size, log[-1][2][0][0]%self.box_size+1)
+            #if self.puz in log2:
+                #print('true')
+                #return False
+            #self.ToStringFromPuzzle()
+            #self.ToStringFromCandidates()
+            del log[-1][2][0]
+            if self.puz.count(0) == 0:
+                return True
+            if len(log) == 0:
+                return False
+            if count==0:
+                if self.puz.count(0) == 0:
+                    return True
+                else:
+                    return False
+            #print('4:',time()-start)
 
 solver = Solver(b_x=3,b_y=3)
-#solver.ToStringFromPuzzle()
-#solver.ToStringFromCandidates()
 puz = [4,0,0,0,9,0,0,0,7,
         0,3,0,0,0,8,0,2,0,
         0,0,7,0,0,0,5,0,0,
@@ -163,7 +247,8 @@ puz_easy = [0,0,0,0,1,0,0,0,0,
             0,4,5,0,3,0,6,2,0,
             0,7,2,5,0,6,3,8,0,
             0,0,0,0,2,0,0,0,0]
-solver.SetPuzzle(puz_easy)
+
+solver.SetPuzzle(puz)
 print(solver.CheckAnsweable())
 solver.ToStringFromPuzzle()
 solver.ToStringFromCandidates()
