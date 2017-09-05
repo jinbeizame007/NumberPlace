@@ -1,5 +1,6 @@
 from copy import deepcopy
 from operator import itemgetter
+from tqdm import tqdm
 
 class Solver:
     def __init__(self, b_x, b_y):
@@ -86,17 +87,19 @@ class Solver:
     def CheckAnsweable(self):
         log = []
         rank = []
-        while True:
+        for step in tqdm(range(1000000)):
             # 確定した場所は埋める
             #self.ToStringFromCandidates()
             #self.ToStringFromPuzzle()
             for i in range(self.cell_size):
                 if self.candidates[i].count(True) == 1:
                     self.PutNumber(i,self.candidates[i].index(True)+1)
+            if self.puz.count(0) == 0:
+                return True
 
             # 候補が無くなったら１つ前に戻す
-            if len(log) != 0 and len(log[-1][2]) == 0:
-                print(log)
+            if False:#len(log) != 0 and len(log[-1][2]) == 0:
+                #print(log)
                 del log[-1]
                 self.puz = deepcopy(log[-1][0])
                 self.candidates = deepcopy(log[-1][1])
@@ -109,23 +112,24 @@ class Solver:
                         #    print(self.candidates[i][j+1])
                         if self.candidates[i][j] == True:
                             # [セル番号*box_size + セル内の数字]
-                            count.append([i*self.box_size+j,self.CountDeletableCandidates(i,j)])
+                            #count.append([i*self.box_size+j,self.CountDeletableCandidates(i,j)])
+                            count.append([i*self.box_size+j,self.candidates[i].count(True)])
                 # ログ：puz, candidates, 優先度順の候補
                 if len(count) == 0:
                     self.puz = deepcopy(log[-1][0])
                     self.candidates = deepcopy(log[-1][1])
-                    del log[-1][2][0]
-                    continue
-                count.sort(key=itemgetter(1))
-                count.reverse()
-                log.append([self.puz, self.candidates, count])
+                    #del log[-1][2][0]
+                    while len(log[-1][2]) == 0:
+                        del log[-1]
+                        self.puz = deepcopy(log[-1][0])
+                        self.candidates = deepcopy(log[-1][1])
+                else:
+                    count.sort(key=itemgetter(1))
+                    #count.reverse()
+                    log.append([deepcopy(self.puz), deepcopy(self.candidates), count])
             # セル番号,数字
-            #print(log[-1][2][0][0])
             self.PutNumber(log[-1][2][0][0]//self.box_size, log[-1][2][0][0]%self.box_size+1)
             del log[-1][2][0]
-            self.ToStringFromPuzzle()
-            self.ToStringFromCandidates()
-            #print(self.candidates[80])
 
             if self.puz.count(0) == 0:
                 return True
@@ -149,7 +153,17 @@ puz = [4,0,0,0,9,0,0,0,7,
         0,0,8,0,0,0,3,0,0,
         0,9,0,2,0,0,0,5,0,
         5,0,0,0,4,0,0,0,1]
-solver.SetPuzzle(puz)
+# p258
+puz_easy = [0,0,0,0,1,0,0,0,0,
+            0,9,7,8,0,3,5,4,0,
+            0,8,1,0,7,0,2,6,0,
+            0,2,0,0,5,0,0,3,0,
+            9,0,6,4,0,7,1,0,2,
+            0,1,0,0,9,0,0,7,0,
+            0,4,5,0,3,0,6,2,0,
+            0,7,2,5,0,6,3,8,0,
+            0,0,0,0,2,0,0,0,0]
+solver.SetPuzzle(puz_easy)
 print(solver.CheckAnsweable())
 solver.ToStringFromPuzzle()
 solver.ToStringFromCandidates()
