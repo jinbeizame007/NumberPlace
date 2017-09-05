@@ -1,4 +1,5 @@
-import numpy as np
+from copy import deepcopy
+from operator import itemgetter
 
 class Solver:
     def __init__(self, b_x, b_y):
@@ -7,11 +8,11 @@ class Solver:
         self.box_size = b_x * b_y
         self.cell_size = self.box_size * self.box_size
         self.puz = [0 for i in range(self.cell_size)]
-        self.candidates = [[True for i in range(b_x*b_y+1)] for j in range(self.cell_size)]
+        self.candidates = [[True for i in range(self.box_size)] for j in range(self.cell_size)]
         self.answer = [0 for i in range(self.cell_size)]
     def ToStringFromPuzzle(self):
         par = '+'
-        for i in range(self.box_size/self.b_x):
+        for i in range(self.box_size//self.b_x):
             for i in range(self.b_x):
                 par += '-'
             par += '+'
@@ -34,27 +35,128 @@ class Solver:
         for y in range(self.box_size):
             for y_ in range(self.b_y):
                 line = ''
-                for x in range(self.box_size*self.box_w):
-                     if self.candidates[y*self.box_size+x//self.b_x][y_*self.box_size+x%self.b_x] == True:
-                         line += str(y_*self.box_size+x%self.b_x)
+                for x in range(self.box_size*self.b_x):
+                    if x%self.b_x == 0 and x != 0:
+                        line += ' '
+                    if self.candidates[y*self.box_size+x//self.b_x][y_*self.b_x+x%self.b_x] == True:
+                        line += str(y_*self.b_x+x%self.b_x+1)
+                    else:
+                        line += '.'
+                print(line)
+            if y != self.box_size-1:
+                print('')
+    def SetPuzzle(self,puz):
+        self.puz = [0 for i in range(self.cell_size)]
+        for i,p in enumerate(puz):
+            if p != 0:
+                #print(p)
+                #print('')
+                #print(i,p)
+                #self.ToStringFromPuzzle()
+                #self.ToStringFromCandidates()
+                self.PutNumber(i,p)
     def DeleteCandidate(self,p,n):
         self.candidates[p][n] = False
     def PutNumber(self,p,n):
         self.puz[p] = n
+        n = n - 1
+        p_x = (p%self.box_size)//self.b_x
+        p_y = p//(self.box_size*self.b_y)
+        #print(p_x,p_y)
+        for i in range(self.box_size):
+            self.candidates[p][i] = False
+            # 横
+            self.candidates[(p//self.box_size)*self.box_size+i][n] = False
+            # 縦
+            self.candidates[(p%self.box_size)+(i*self.box_size)][n] = False
+            # BOX内
+            self.candidates[p_y*self.box_size*self.b_y+self.box_size*(i//self.b_x)+p_x*self.b_x+(i%self.b_x)][n] = False
+    def CountDeletableCandidates(self,p,n):
+        count = 0
         p_x = (p%self.box_size)//self.b_x
         p_y = p//self.box_size
         for i in range(self.box_size):
-            self.candidates[(p//self.box_size)+i][n] = False
-            self.candidates[(p%self.box_size)*(i*self.box_size)][n] = False
-            self.candidates[p_y+(self.box_size*(i//self.d_x))+p_x+(i%self.b_x)]
-        """
-        for i in range(self.b_x*self.b_x):
-            self.candidates[(p%(self.b_x*self.b_x))+i][n] = False
-        for i in range(self.b_y*self.b_y):
-            self.candidates[(p%(self.b_y*self.b_y))+i][n] = False
-        for i in range(self.b_x*self.b_y):
-            self.candidates[(p%())]
-        """
+            if self.candidates[(p//self.box_size)+i][n] == True:
+                count+=1
+            if self.candidates[(p%self.box_size)+(i*self.box_size)][n] == True:
+                count+=1
+            if self.candidates[p_y+(self.box_size*(i//self.b_x))+p_x+(i%self.b_x)][n] == True and p_y+(self.box_size*(i//self.b_x)) != p//self.box_size and p_x+(i%self.b_x) != p%self.box_size:
+                count+=1
+        return count
+    def CheckAnsweable(self):
+        log = []
+        rank = []
+        while True:
+            # 確定した場所は埋める
+            #self.ToStringFromCandidates()
+            #self.ToStringFromPuzzle()
+            for i in range(self.cell_size):
+                if self.candidates[i].count(True) == 1:
+                    self.PutNumber(i,self.candidates[i].index(True)+1)
 
-solver = Solver(b_x=3,b_y=2)
+            # 候補が無くなったら１つ前に戻す
+            if len(log) != 0 and len(log[-1][2]) == 0:
+                print(log)
+                del log[-1]
+                self.puz = deepcopy(log[-1][0])
+                self.candidates = deepcopy(log[-1][1])
+            else:
+                # 各セルに各数字を置いた際の削除可能な候補の数を求める
+                count = []
+                for i in range(self.cell_size):
+                    for j in range(self.box_size):
+                        #if i==80:
+                        #    print(self.candidates[i][j+1])
+                        if self.candidates[i][j] == True:
+                            # [セル番号*box_size + セル内の数字]
+                            count.append([i*self.box_size+j,self.CountDeletableCandidates(i,j)])
+                # ログ：puz, candidates, 優先度順の候補
+                if len(count) == 0:
+                    self.puz = deepcopy(log[-1][0])
+                    self.candidates = deepcopy(log[-1][1])
+                    del log[-1][2][0]
+                    continue
+                count.sort(key=itemgetter(1))
+                count.reverse()
+                log.append([self.puz, self.candidates, count])
+            # セル番号,数字
+            #print(log[-1][2][0][0])
+            self.PutNumber(log[-1][2][0][0]//self.box_size, log[-1][2][0][0]%self.box_size+1)
+            del log[-1][2][0]
+            self.ToStringFromPuzzle()
+            self.ToStringFromCandidates()
+            #print(self.candidates[80])
+
+            if self.puz.count(0) == 0:
+                return True
+            if len(log) == 0:
+                return False
+            if count==0:
+                if self.puz.count(0) == 0:
+                    return True
+                else:
+                    return False
+
+solver = Solver(b_x=3,b_y=3)
+#solver.ToStringFromPuzzle()
+#solver.ToStringFromCandidates()
+puz = [4,0,0,0,9,0,0,0,7,
+        0,3,0,0,0,8,0,2,0,
+        0,0,7,0,0,0,5,0,0,
+        0,2,0,0,0,0,0,0,0,
+        9,0,0,0,5,0,0,0,4,
+        0,0,0,0,0,0,0,8,0,
+        0,0,8,0,0,0,3,0,0,
+        0,9,0,2,0,0,0,5,0,
+        5,0,0,0,4,0,0,0,1]
+solver.SetPuzzle(puz)
+print(solver.CheckAnsweable())
 solver.ToStringFromPuzzle()
+solver.ToStringFromCandidates()
+
+while True:
+    p, n = map(int, input().split())
+    solver.PutNumber(p, n)
+    solver.ToStringFromPuzzle()
+    #print(solver.CheckAnsweable())
+    solver.ToStringFromCandidates()
