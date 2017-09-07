@@ -104,8 +104,9 @@ class Solver:
                         count[2].append(p+j%self.b_x+(j//self.b_x)*self.box_size)
                 #if len(count[0]) + len(count[1]) + len(count[2]) == 0:
                 #    self.errorFlag = True
-                for c in count:
+                for i,c in enumerate(count):
                     if len(c) == 1:
+                        print(i,c)
                         self.PutNumber(c[0],n+1)
                         self.updateFlag = True
                         if self.errorFlag == True:
@@ -215,14 +216,14 @@ class Generator:
 solver = Solver(b_x=3,b_y=3)
 # p104
 puz_hard = [4,0,0,0,9,0,0,0,7,
-        0,3,0,0,0,8,0,2,0,
-        0,0,7,0,0,0,5,0,0,
-        0,2,0,0,0,0,0,0,0,
-        9,0,0,0,5,0,0,0,4,
-        0,0,0,0,0,0,0,8,0,
-        0,0,8,0,0,0,3,0,0,
-        0,9,0,2,0,0,0,5,0,
-        5,0,0,0,4,0,0,0,1]
+            0,3,0,0,0,8,0,2,0,
+            0,0,7,0,0,0,5,0,0,
+            0,2,0,0,0,0,0,0,0,
+            9,0,0,0,5,0,0,0,4,
+            0,0,0,0,0,0,0,8,0,
+            0,0,8,0,0,0,3,0,0,
+            0,9,0,2,0,0,0,5,0,
+            5,0,0,0,4,0,0,0,1]
 
 puz_hard2 = [4,0,0,0,0,2,0,0,3,
             0,0,0,0,4,0,1,0,0,
@@ -267,11 +268,12 @@ for puz in puz17[0:100]:
         count += 1
 print(count)
 """
-#solver.SetPuzzle(puz_easy)
-#print(solver.Solve())
+solver.SetPuzzle(puz_hard)
+#solver.ToStringFromCandidates()
+print(solver.Solve())
 #solver.ToStringFromPuzzle()
-generator = Generator(3,3)
-generator.Generate(20)
+#generator = Generator(3,3)
+#generator.Generate(20)
 #generator.ToStringFromPuzzle()
 #solver.SetPuzzle(generator.puz[:])
 #print(solver.Solve())
