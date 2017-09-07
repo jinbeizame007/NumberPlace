@@ -175,7 +175,6 @@ class Generator:
         self.puz = [0 for i in range(self.cell_size)]
         count = 0
         while count < clue_count:
-            flag = True
             p = randint(0,self.cell_size-1)
             n = randint(1,self.box_size)
             if self.CheckRule(p,n):

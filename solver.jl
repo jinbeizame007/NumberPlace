@@ -150,6 +150,110 @@ function Solve(solver::Solver)
     end
     return true
 end
+function CalcScore(solver::Solver)
+    score = 0
+    for cand in solver.candidates
+        for can in cand
+            score += countnz(can.=true)^2
+        end
+    end
+    return score
+end
+
+mutable struct Generator
+    puzzle::Array{Int64,2}
+    score::Int64
+    solver::Solver
+    scoreFlag::Bool
+    function Generator()
+        new(zeros(Int64,(9,9)),100000,Solver(3,3),false)
+    end
+end
+function CheckRule(puz::Array{Int64,2},x::Int64,y::Int64,n::Int64)
+    if puz[y,x] != 0
+        return false
+    end
+    px = div(x-1,bx) * bx + 1
+    py = div(y-1,by) * by + 1
+    for i in 1:box_size
+        if puz[x,i] == n
+            return false
+        end
+        if puz[i,y] == n
+            return false
+        end
+        if puz[py+div(i-1,bx),px+mod(i-1,bx)] == n
+            return false
+        end
+    end
+    return true
+end
+function init_puz(generator::Generator, clue_count::Int64)
+    generator.solver.puzzle = zeros(Int64,(9,9))
+    count = 0
+    while count < clue_count
+        x = rand(1:box_size)
+        y = rand(1:box_size)
+        n = rand(1:box_size)
+        if CheckRule(generator.solver.puzzle,x,y,n)
+            count += 1
+            generator.solver = PutNumber(generator.solver,x,y,n)
+        end
+    end
+    generator.score = CalcScore(generator.solver)
+    return generator
+end
+function LocalSearch(generator::Generator)
+    puzzle = copy(generator.solver.puzzle)
+    for y_ in 1:box_size
+        for x_ in 1:box_size
+            puz = copy(puzzle)
+            if puz[y_,x_] == 0
+                continue
+            end
+            puz[y_,x_] = 0
+            for y in 1:box_size
+                for x in 1:box_size
+                    for n in 1:box_size
+                        if CheckRule(puz,x,y,n)
+                            puz[y,x] = n
+                            generator.solver = Solver(3,3)
+                            generator.solver = SetPuzzle(generator.solver,puz)
+                            score = CalcScore(generator.solver)
+                            if score < generator.score
+                                generator.score = score
+                                generator.solver.puzzle = copy(puz)
+                                generator.calcFlag = true
+                                return generator
+                            end
+                            puz[y,x] = 0
+                        end
+                    end
+                end
+            end
+        end
+    end
+    return generator
+end
+function Generate(generator::Generator, clue_count::Int64)
+    generator = init_puz(generator,clue_count)
+    progress = Progress(10000)
+    while true
+        generator = LocalSearch(generator)
+        if generator.scoreFlag == false
+            generator = Generator()
+            generator = init_puz(generator,clue_count)
+            continue
+        end
+        generator.solver = Solver(3,3)
+        generator.solver = SetPuzzle(generator.solver, generator.puzzle)
+        if Solve(generator.solver)
+            ToStringFromPuzzle(generator.puzzle)
+            return true
+        end
+        next!(progress)
+    end
+end
 
 puz_easy = [0 0 0 0 1 0 0 0 0
             0 9 7 8 0 3 5 4 0
@@ -170,7 +274,7 @@ puz_hard = [4 0 0 0 9 0 0 0 7
             0 9 0 2 0 0 0 5 0
             5 0 0 0 4 0 0 0 1]
 
-
+"""
 puz17 = [zeros(Int64,(9,9)) for i in 1:49157]
 lines = open("17puz49157.txt","r") do fp
     readlines(fp)
@@ -193,3 +297,8 @@ for i in 1:49157
     end
     next!(progress)
 end
+"""
+generator = Generator()
+generator = init_puz(generator,17)
+#ToStringFromPuzzle(generator.solver.puzzle)
+#Generate(generator,20)
