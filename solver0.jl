@@ -4,6 +4,7 @@ bx = 3
 by = 3
 box_size = bx * by
 cell_size = box_size * box_size
+#solver = Solver(3,3)
 
 mutable struct Solver
     bx::Int64
@@ -18,6 +19,9 @@ mutable struct Solver
         new(bx,by,bx*by,(bx*by)^2,zeros(Int64,(9,9)),cand,false)
     end
 end
+
+solver = Solver(3,3)
+
 function ToStringFromPuzzle(puz::Array{Int64,2})
     par = "+---+---+---+"
     line = ""
@@ -55,28 +59,24 @@ function ToStringFromCandidates(cand::Array{Array{Array{Bool,1},1},1})
         println("")
     end
 end
-function DeleteCandidate(solver::Solver,x::Int64,y::Int64,n::Int64)
+function DeleteCandidate(x::Int64,y::Int64,n::Int64)
     solver.candidates[y][x][n] = false
-    return solver
 end
-function PutNumber(solver::Solver,x::Int64,y::Int64,n::Int64)
+function PutNumber(x::Int64,y::Int64,n::Int64)
     if solver.candidates[y][x][n] == false
-        #println("no")
-        return solver
+        return
     end
-    #return solver
     solver.puzzle[y,x] = n
     px = div(x-1,bx) * bx + 1
     py = div(y-1,by) * by + 1
     for i in 1:box_size
-        solver = DeleteCandidate(solver,x,y,i)
-        solver = DeleteCandidate(solver,x,i,n)
-        solver = DeleteCandidate(solver,i,y,n)
-        solver = DeleteCandidate(solver,px+mod(i-1,bx),py+div(i-1,bx),n)
+        DeleteCandidate(x,y,i)
+        DeleteCandidate(x,i,n)
+        DeleteCandidate(i,y,n)
+        DeleteCandidate(px+mod(i-1,bx),py+div(i-1,bx),n)
     end
-    return solver
 end
-function SetPuzzle(solver::Solver,puz::Array{Int64,2})
+function SetPuzzle(puz::Array{Int64,2})
     solver.puzzle = zeros(Int64,(9,9))
     cand = [[[true for i in 1:box_size] for j in 1:box_size] for l in 1:box_size]
     solver.candidates = cand
@@ -84,13 +84,12 @@ function SetPuzzle(solver::Solver,puz::Array{Int64,2})
     for y in 1:box_size
         for x in 1:box_size
             if puz[y,x] != 0
-                solver = PutNumber(solver,x,y,puz[y,x])
+                PutNumber(x,y,puz[y,x])
             end
         end
     end
-    return solver
 end
-function Singles(solver::Solver)
+function Singles()
     for y in 1:box_size
         for x in 1:box_size
             count = 0
@@ -102,7 +101,7 @@ function Singles(solver::Solver)
             if count != 1
                 continue
             end
-            solver = PutNumber(solver,x,y,findfirst(solver.candidates[y][x],true))
+            PutNumber(x,y,findfirst(solver.candidates[y][x],true))
             solver.updateFlag = true
         end
     end
@@ -124,19 +123,17 @@ function Singles(solver::Solver)
             end
             for c in count
                 if length(c) == 2
-                    solver = PutNumber(solver,c[1],c[2],n)
+                    PutNumber(c[1],c[2],n)
                     solver.updateFlag = true
                 end
             end
         end
     end
-    return solver
 end
-function Solve(solver::Solver)
+function Solve()
     while true
         solver.updateFlag = false
-        solver = Singles(solver)
-        #ToStringFromPuzzle(solver.puzzle)
+        Singles()
         if solver.updateFlag
             continue
         end
@@ -152,7 +149,7 @@ function Solve(solver::Solver)
     #ToStringFromPuzzle(solver.puzzle)
     return true
 end
-function CalcScore(solver::Solver)
+function CalcScore()
     #ToStringFromPuzzle(solver.puzzle)
     score = 0
     for cand in solver.candidates
@@ -291,7 +288,10 @@ puz_hard = [4 0 0 0 9 0 0 0 7
             0 9 0 2 0 0 0 5 0
             5 0 0 0 4 0 0 0 1]
 
-"""
+#SetPuzzle(puz_easy)
+#println(Solve())
+#ToStringFromPuzzle(solver.puzzle)
+
 puz17 = [zeros(Int64,(9,9)) for i in 1:49157]
 lines = open("17puz49157.txt","r") do fp
     readlines(fp)
@@ -308,14 +308,14 @@ for i in 1:49157
         end
     end
     solver = Solver(3,3)
-    solver = SetPuzzle(solver,puz)
-    if Solve(solver)
+    SetPuzzle(puz)
+    if Solve()
         count += 1
     end
     next!(progress)
 end
-"""
-generator = Generator()
-generator = init_puz(generator,17)
+
+#generator = Generator()
+#generator = init_puz(generator,17)
 #ToStringFromPuzzle(generator.solver.puzzle)
-Generate(generator,17)
+#Generate(generator,17)
