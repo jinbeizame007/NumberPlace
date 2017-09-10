@@ -1,21 +1,23 @@
-using ProgressMeter
+#using ProfileView
+#using ProgressMeter
+#using Base.Threads
 
-bx = 3
-by = 3
-box_size = bx * by
-cell_size = box_size * box_size
+const bx = 3
+const by = 3
+const box_size = bx * by
+const cell_size = box_size * box_size
+#bx = 3
+#by = 3
+#box_size = bx * by
+#cell_size = box_size * box_size
+global updateFlag = [false]
 
-mutable struct Solver
-    bx::Int64
-    by::Int64
-    box_size::Int64
-    cell_size::Int64
+type Solver
     puzzle::Array{Int64,2}
     candidates::Array{Array{Array{Bool,1},1},1}
-    updateFlag::Bool
-    function Solver(bx::Int64,by::Int64)
+    function Solver()
         cand = [[[true for i in 1:box_size] for j in 1:box_size] for l in 1:box_size]
-        new(bx,by,bx*by,(bx*by)^2,zeros(Int64,(9,9)),cand,false)
+        new(zeros(Int64,(9,9)),cand)
     end
 end
 function ToStringFromPuzzle(puz::Array{Int64,2})
@@ -55,46 +57,49 @@ function ToStringFromCandidates(cand::Array{Array{Array{Bool,1},1},1})
         println("")
     end
 end
-function DeleteCandidate(solver::Solver,x::Int64,y::Int64,n::Int64)
-    solver.candidates[y][x][n] = false
-    return solver
+function DeleteCandidate(candidates::Array{Array{Array{Bool,1},1},1},x::Int64,y::Int64,n::Int64)
+    candidates[y][x][n] = false
 end
-function PutNumber(solver::Solver,x::Int64,y::Int64,n::Int64)
-    if solver.candidates[y][x][n] == false
-        #println("no")
-        return solver
+function PutNumber(puzzle::Array{Int64,2},candidates::Array{Array{Array{Bool,1},1},1},x::Int64,y::Int64,n::Int64)
+    if candidates[y][x][n] == false
+        #println("false")
+        return
     end
-    #return solver
-    solver.puzzle[y,x] = n
+    puzzle[y,x] = n
     px = div(x-1,bx) * bx + 1
     py = div(y-1,by) * by + 1
     for i in 1:box_size
-        solver = DeleteCandidate(solver,x,y,i)
-        solver = DeleteCandidate(solver,x,i,n)
-        solver = DeleteCandidate(solver,i,y,n)
-        solver = DeleteCandidate(solver,px+mod(i-1,bx),py+div(i-1,bx),n)
+        candidates[y][x][i] = false
+        candidates[y][i][n] = false
+        candidates[i][x][n] = false
+        candidates[py+div(i-1,bx)][px+mod(i-1,bx)][n] = false
     end
-    return solver
 end
-function SetPuzzle(solver::Solver,puz::Array{Int64,2})
-    solver.puzzle = zeros(Int64,(9,9))
-    cand = [[[true for i in 1:box_size] for j in 1:box_size] for l in 1:box_size]
-    solver.candidates = cand
-    #println("aaa")
+function SetPuzzle(puzzle::Array{Int64,2},candidates::Array{Array{Array{Bool,1},1},1},puz::Array{Int64,2})
+    """
     for y in 1:box_size
         for x in 1:box_size
-            if puz[y,x] != 0
-                solver = PutNumber(solver,x,y,puz[y,x])
+            puzzle[y,x] = 0
+            for n in 1:box_size
+                candidates[y][x][n] = true
             end
         end
     end
-    return solver
+    """
+    for y in 1:box_size
+        for x in 1:box_size
+            if puz[y,x] != 0
+                PutNumber(puzzle,candidates,x,y,puz[y,x])
+            end
+        end
+    end
 end
-function Singles(solver::Solver)
+function Singles(puzzle::Array{Int64,2},candidates::Array{Array{Array{Bool,1},1},1})
+    n2 = 0
     for y in 1:box_size
         for x in 1:box_size
             count = 0
-            for cand in solver.candidates[y][x]
+            for cand in candidates[y][x]
                 if cand == true
                     count += 1
                 end
@@ -102,46 +107,66 @@ function Singles(solver::Solver)
             if count != 1
                 continue
             end
-            solver = PutNumber(solver,x,y,findfirst(solver.candidates[y][x],true))
-            solver.updateFlag = true
+            PutNumber(puzzle,candidates,x,y,findfirst(candidates[y][x],true))
+            updateFlag[1] = true
         end
     end
+    count2 = zeros(Int64,3)
+    count = zeros(Int64,(3,2))
     for i in 1:box_size
+        #count2 = zeros(Int64,(box_size,3))
         for n in 1:box_size
-            count = [[],[],[]]
+            for j in 1:3
+                for l in 1:2
+                    count[j,l] = 0
+                end
+                count2[j] = 0
+            end
+            #count = zeros(Int64,(3,2))#[[],[],[]]
+            #count2 = zeros(Int64,3)
             px = mod(i-1,bx) * bx + 1
             py = div(i-1,bx) * by + 1
             for j in 1:box_size
-                if solver.candidates[i][j][n] == true
-                    append!(count[1],[j,i])
+                if candidates[i][j][n] == true
+                    #append!(count[1],[j,i])
+                    count[1,1] = j
+                    count[1,2] = i
+                    count2[1] += 1
                 end
-                if solver.candidates[j][i][n] == true
-                    append!(count[2],[i,j])
+                if candidates[j][i][n] == true
+                    #append!(count[2],[i,j])
+                    count[2,1] = i
+                    count[2,2] = j
+                    count2[2] += 1
                 end
-                if solver.candidates[py+div(j-1,bx)][px+mod(j-1,bx)][n] == true
-                    append!(count[3],[px+mod(j-1,bx),py+div(j-1,bx)])
+                if candidates[py+div(j-1,bx)][px+mod(j-1,bx)][n] == true
+                    #append!(count[3],[px+mod(j-1,bx),py+div(j-1,bx)])
+                    count[3,1] = px+mod(j-1,bx)
+                    count[3,2] = py+div(j-1,bx)
+                    count2[3] += 1
                 end
             end
-            for c in count
-                if length(c) == 2
-                    solver = PutNumber(solver,c[1],c[2],n)
-                    solver.updateFlag = true
+            for j in 1:3
+                if count2[j] == 1
+                    PutNumber(puzzle,candidates,count[j,1],count[j,2],n)
+                    updateFlag[1] = true
                 end
             end
         end
     end
-    return solver
 end
 function Solve(solver::Solver)
     while true
-        solver.updateFlag = false
-        solver = Singles(solver)
+        updateFlag[1] = false
+        Singles(solver.puzzle,solver.candidates)
         #ToStringFromPuzzle(solver.puzzle)
-        if solver.updateFlag
+        #println(updateFlag[1][1])
+        if updateFlag[1]
             continue
         end
         break
     end
+    #ToStringFromPuzzle(solver.puzzle)
     for y in 1:box_size
         for x in 1:box_size
             if solver.puzzle[y,x] == 0
@@ -149,7 +174,6 @@ function Solve(solver::Solver)
             end
         end
     end
-    #ToStringFromPuzzle(solver.puzzle)
     return true
 end
 function CalcScore(solver::Solver)
@@ -175,7 +199,7 @@ mutable struct Generator
     solver::Solver
     scoreFlag::Bool
     function Generator()
-        new(zeros(Int64,(9,9)),100000,Solver(3,3),false)
+        new(zeros(Int64,(9,9)),100000,Solver(),false)
     end
 end
 function CheckRule(cand::Array{Array{Array{Bool,1},1},1},x::Int64,y::Int64,n::Int64)
@@ -206,7 +230,7 @@ function init_puz(generator::Generator, clue_count::Int64)
         n = rand(1:box_size)
         if CheckRule(generator.solver.candidates,x,y,n)
             count += 1
-            generator.solver = PutNumber(generator.solver,x,y,n)
+            PutNumber(generator.solver.puzzle,generator.solver.candidates,x,y,n)
         end
     end
     generator.puzzle = copy(generator.solver.puzzle)
@@ -222,22 +246,22 @@ function LocalSearch(generator::Generator)
                 continue
             end
             puz[y_,x_] = 0
-            solver = Solver(3,3)
-            solver = SetPuzzle(solver,puz)
+            solver = Solver()
+            SetPuzzle(solver.puzzle,solver.candidates,puz)
             for y in 1:box_size
                 for x in 1:box_size
                     for n in 1:box_size
                         if CheckRule(solver.candidates,x,y,n)
                             puz[y,x] = n
-                            generator.solver = Solver(3,3)
-                            generator.solver = SetPuzzle(generator.solver,puz)
+                            generator.solver = Solver()
+                            SetPuzzle(generator.solver.puzzle,generator.solver.candidates,puz)
                             score = CalcScore(generator.solver)
                             if score < generator.score
-                                #println(score)
+                                #prInt64ln(score)
                                 #ToStringFromPuzzle(puz)
                                 generator.puzzle = copy(puz)
                                 generator.score = score
-                                generator.solver = SetPuzzle(generator.solver, puz)
+                                SetPuzzle(generator.solver.puzzle,generator.solver.candidates, puz)
                                 generator.scoreFlag = true
                                 return generator
                             end
@@ -252,7 +276,6 @@ function LocalSearch(generator::Generator)
 end
 function Generate(generator::Generator, clue_count::Int64)
     generator = init_puz(generator,clue_count)
-    #progress = Progress(100000)
     while true
         generator.scoreFlag = false
         generator = LocalSearch(generator)
@@ -291,31 +314,50 @@ puz_hard = [4 0 0 0 9 0 0 0 7
             0 9 0 2 0 0 0 5 0
             5 0 0 0 4 0 0 0 1]
 
-"""
-puz17 = [zeros(Int64,(9,9)) for i in 1:49157]
-lines = open("17puz49157.txt","r") do fp
-    readlines(fp)
-end
-count = 0
-progress = Progress(49157)
-for i in 1:49157
-    puz = zeros(Int64,(9,9))
-    for y in 1:box_size
-        for x in 1:box_size
-            if lines[i][(y-1)*box_size+x] != '.'
-                puz[y,x] = Int64(lines[i][(y-1)*box_size+x]) - 48
+
+#solver = Solver()
+#SetPuzzle(solver.puzzle,solver.candidates,puz_easy)
+#println(Solve(solver))
+
+function solve_puz17()
+    puz17 = [zeros(Int64,(9,9)) for i in 1:49157]
+    lines = open("17puz49157.txt","r") do fp
+        readlines(fp)
+    end
+    count = 0
+    #progress = Progress(49157)
+    #solver = Solver()
+    for i in 1:49157
+        puz = zeros(Int64,(9,9))
+        for y in 1:box_size
+            for x in 1:box_size
+                if lines[i][(y-1)*box_size+x] != '.'
+                    puz[y,x] = Int64(lines[i][(y-1)*box_size+x]) - 48
+                end
             end
         end
+        solver = Solver()
+        SetPuzzle(solver.puzzle,solver.candidates,puz)
+        if Solve(solver)
+            count += 1
+        end
+        #next!(progress)
     end
-    solver = Solver(3,3)
-    solver = SetPuzzle(solver,puz)
-    if Solve(solver)
-        count += 1
-    end
-    next!(progress)
+    println(count)
+
 end
-"""
-generator = Generator()
-generator = init_puz(generator,17)
-#ToStringFromPuzzle(generator.solver.puzzle)
-Generate(generator,17)
+#Profile.clear()
+#@profile solve_puz17()
+#Profile.print(format=:flat)
+#@time solve_puz17()
+
+function test()
+    for i in 1:20
+        generator = Generator()
+        generator = init_puz(generator,21)
+        ToStringFromPuzzle(generator.solver.puzzle)
+        Generate(generator,21)
+    end
+end
+
+@time test()
