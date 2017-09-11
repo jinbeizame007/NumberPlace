@@ -65,12 +65,12 @@ function DeleteCandidate(puzzle::Array{Int64,2},candidates::Array{Int64,3},y::In
         end
     end
     if count == 0
-        #errorFlag[1] = true
+        errorFlag[1] = true
     end
 end
 function PutNumber(puzzle::Array{Int64,2},candidates::Array{Int64,3},x::Int64,y::Int64,n::Int64)
     if candidates[y,x,n] == 0
-        #errorFlag[1] = true
+        errorFlag[1] = true
         return
     end
     for i in 1:box_size
@@ -88,6 +88,7 @@ function PutNumber(puzzle::Array{Int64,2},candidates::Array{Int64,3},x::Int64,y:
     end
 end
 function SetPuzzle(puzzle::Array{Int64,2},candidates::Array{Int64,3},puz::Array{Int64,2})
+    errorFlag[1] = false
     for y in 1:box_size
         for x in 1:box_size
             puzzle[y,x] = 0
@@ -176,7 +177,7 @@ function Singles(puzzle::Array{Int64,2},candidates::Array{Int64,3})
             for j in 1:3
                 if count2[j] == 0
                     updateFlag[1] = false
-                    #errorFlag[1] = true
+                    errorFlag[1] = true
                     return
                 end
                 if count2[j] == 1 && puzzle[count[j,2],count[j,1]] == 0
@@ -311,9 +312,9 @@ function CheckRule(puzzle::Array{Int64,2},cand::Array{Int64,3},x::Int64,y::Int64
     end
 end
 function init_puz(generator::Generator, clue_count::Int64)
-    generator.solver = Solver()
-    #generator.solver.puzzle = zeros(Int64,(9,9))
-    #generator.solver.candidates = ones(Int64,(9,9,9))
+    #generator.solver = Solver()
+    generator.solver.puzzle = zeros(Int64,(9,9))
+    generator.solver.candidates = ones(Int64,(9,9,9))
     count = 0
     while count < clue_count
         x = rand(1:box_size)
@@ -328,24 +329,6 @@ function init_puz(generator::Generator, clue_count::Int64)
     generator.score = CalcScore(generator.solver.candidates)
     return generator
 end
-"""
-function init_puz(generator::Generator, clue_count::Int64)
-    generator.solver.puzzle = zeros(Int64,(9,9))
-    count = 0
-    while count < clue_count
-        x = rand(1:box_size)
-        y = rand(1:box_size)
-        n = rand(1:box_size)
-        if CheckRule(generator.solver.puzzle,generator.solver.candidates,x,y,n)
-            count += 1
-            PutNumber(generator.solver.puzzle,generator.solver.candidates,x,y,n)
-        end
-    end
-    generator.puzzle = copy(generator.solver.puzzle)
-    generator.score = CalcScore(generator.solver.candidates)
-    return generator
-end
-"""
 function LocalSearch(generator::Generator)
     puzzle = copy(generator.puzzle)
     for y_ in 1:box_size
@@ -365,16 +348,17 @@ function LocalSearch(generator::Generator)
                             solver = Solver()
                             SetPuzzle(solver.puzzle,solver.candidates,puz)
                             Solve(solver)
-                            score = CalcScore(solver.candidates)
-                            if score < generator.score
-                                #prInt64ln(score)
-                                #ToStringFromPuzzle(puz)
-                                generator = Generator()
-                                generator.puzzle = copy(puz)
-                                generator.score = score
-                                SetPuzzle(generator.solver.puzzle,generator.solver.candidates, solver.puzzle)
-                                generator.scoreFlag = true
-                                return generator
+                            #ToStringFromPuzzle(solver.puzzle)
+                            if errorFlag[1] == false
+                                score = CalcScore(solver.candidates)
+                                if score < generator.score
+                                    generator = Generator()
+                                    generator.puzzle = copy(puz)
+                                    generator.score = score
+                                    SetPuzzle(generator.solver.puzzle,generator.solver.candidates, puz)#solver.puzzle)
+                                    generator.scoreFlag = true
+                                    return generator
+                                end
                             end
                             puz[y,x] = 0
                         end
@@ -386,25 +370,20 @@ function LocalSearch(generator::Generator)
     return generator
 end
 function Generate(generator::Generator, clue_count::Int64)
-    #println("********************")
     while true
-        errorFlag[1] = false
         generator.scoreFlag = false
         generator = LocalSearch(generator)
-        #println(generator.score)
         if generator.scoreFlag == false
             break
         end
     end
-    if Solve(generator.solver)
+    if Solve(generator.solver)# && errorFlag[1]==false
         ToStringFromPuzzle(generator.puzzle)
         ToStringFromPuzzle(generator.solver.puzzle)
-        println(count)
         return true
     else
         return false
     end
-    #next!(progress)
 end
 
 puz_easy = [0 0 0 0 1 0 0 0 0
@@ -464,33 +443,36 @@ end
 #@profile solve_puz17()##
 #Profile.print(format=:flat)
 #@time solve_puz17()
-
+"""
 function test()
-    for i in 1:20
-        generator = Generator()
-        generator = init_puz(generator,21)
-        #ToStringFromPuzzle(generator.solver.puzzle)
-        Generate(generator,21)
-    end
+    #for i in 1:20
+    generator = Generator()
+    generator = init_puz(generator,18)
+    Generate(generator,18)
+    #end
 end
-@time test()
+"""
+#@time test()
 #Profile.clear()
 #@profile test()
 #Profile.print(format=:flat)
 
-#generator = Generator()
-#generator = init_puz(generator,21)
 #@time Generate(generator,21)
 #ToStringFromPuzzle(generator.solver.puzzle)
 #ToStringFromCandidates(generator.solver.candidates)
 #ToStringFromPuzzle(generator.solver.puzzle)
 #Profile.clear()
-count = 0
-
-#while Generate(generator,21) == false
-#    count += 1
-#    generator = Generator()
-#    generator = init_puz(generator,21)
-#end
+function test(clue::Int64)
+    count = 0
+    generator = Generator()
+    generator = init_puz(generator,clue)
+    while Generate(generator,clue) == false
+        count += 1
+        println(count)
+        generator = Generator()
+        generator = init_puz(generator,clue)
+    end
+end
+@time test(17)
 #println(count)
 #Profile.print(format=:flat)
